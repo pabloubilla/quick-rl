@@ -329,6 +329,7 @@ def main():
     td_loss_history = []
     error_list = []
 
+    # run episodes
     for ep in range(episodes):
         if verbose: print(f'Episode {ep}')
         # reduce exploration as we progress
@@ -343,7 +344,7 @@ def main():
         answered = np.zeros(n_questions)
 
         # state is a vector that joins them 3
-        state = np.concatenate([s_p, answered])
+        state = np.concatenate([s_p, answered]) # this probably doesnt work, could just be s_p instead
 
         # maybe state can be current prediction
         # s_p = imputer.transform(np.array([s]))[0]
@@ -358,6 +359,7 @@ def main():
         a_list = []
         next_s_list = []
         done_list = []
+        # iterate over questions to ask
         for i in range(m_questions):
             # print current state
             if verbose: print('-'*10)
@@ -368,6 +370,7 @@ def main():
             qvalues = agent.get_qvalues([state])
             a = agent.sample_actions(qvalues)[0]
 
+            # update s with the answer
             if real_s[a] == 1:
                 # update s
                 next_s = s.copy()
@@ -379,21 +382,23 @@ def main():
             next_answered = answered.copy()
             next_answered[a] = 1
 
-
+            # create copy of s for prediction
             s_predict = next_s.copy()
             # # change 0 for nan
             # s_predict[s_predict == 0] = np.nan
             # # change -1 for 0
             # s_predict[s_predict == -1] = 0
-            # predict
+            # predict using imputer
             s_predict = imputer.transform(np.array([s_predict]))[0]
             next_s_p = s_predict.copy()
 
             # if verbose: print(f'Predict probs {s_predict}')
-            # round
+            # round prediction
             s_predict = np.round(s_predict)
-            r = 0
 
+            # by default reward is 0
+            r = 0
+            # if last question compute reward
             if i == m_questions-1:
                 if verbose: print(f'Predict vals {s_predict}')
                 if verbose: print(f'Real s {real_s}')
@@ -401,16 +406,18 @@ def main():
                 if verbose: print(f'Reward {r}')
                 done = True
 
+            # create next state
             next_state = np.concatenate([next_s_p, next_answered])
-
+            
+            # append to lists
             s_list.append(state)
             a_list.append(a)
             r_list.append(r)
             next_s_list.append(next_state)
             done_list.append(done)
 
+            # update state
             state = next_state
-
             # update state
             s = next_s
 
@@ -432,7 +439,7 @@ def main():
         opt.zero_grad()
 
 
-        ### compute error for all people
+        ### compute error for all people (this should probably be a separate function)
         if ep % refresh_target_network_freq == 0:
             # iterate train
             error = 0
@@ -495,6 +502,7 @@ def main():
             plt.savefig(f'output/error_list_E{episodes}_M{m_questions}_N{n_questions}_ts{train_size}.png')
             plt.close()
 
+        # 
         if ep % loss_freq == 0:
             mean_rw_history.append(np.mean(r_list))
             td_loss_history.append(loss.data.cpu().item())
