@@ -222,38 +222,39 @@ def epsilon_schedule(start_eps, end_eps, step, final_step):
     return start_eps + (end_eps-start_eps)*min(step, final_step)/final_step
 
 def greedy_0(imputer, train, m_questions):
-        # test error using a greedy 0 policy
-        n_questions = train.shape[1]
-        error_greedy_list = []
-        for person_i in range(train.shape[0]):
-            real_s_i = train.iloc[person_i].values
-            s_i = np.nan*np.ones()
-            for j in range(m_questions):
-                probs_ij = imputer.transform(np.array([s_i]))[0]
-                # compute variance
-                var_ij = probs_ij*(1-probs_ij)
-                # print(f'Variances {var_ij}')
-                # choose the one with the highest variance
-                a_i = np.argmax(var_ij)
-                # print(f'Question {a_i}')
-                if real_s_i[a_i] == 1:
-                    # update s
-                    next_s_i = s_i.copy()
-                    next_s_i[a_i] = 1
-                else:
-                    next_s_i = s_i.copy()
-                    next_s_i[a_i] = 0
-                if j == m_questions-1:
-                    # compute error
-                    s_predict = next_s_i.copy()
-                    s_predict = imputer.transform(np.array([s_predict]))[0]
-                    # round
-                    s_predict = np.round(s_predict)
-                    error = -np.mean(np.abs(s_predict - real_s_i))
-                    error_greedy_list.append(error)
-                s_i = next_s_i
-        error_greedy = np.mean(error_greedy_list)
-
+    # test error using a greedy 0 policy
+    n_questions = train.shape[1]
+    error_greedy_list = []
+    for person_i in range(train.shape[0]):
+        real_s_i = train.iloc[person_i].values
+        s_i = np.nan*np.ones(n_questions)
+        for j in range(m_questions):
+            probs_ij = imputer.transform(np.array([s_i]))[0]
+            # compute variance
+            var_ij = probs_ij*(1-probs_ij)
+            # print(f'Variances {var_ij}')
+            # choose the one with the highest variance
+            a_i = np.argmax(var_ij)
+            # print(f'Question {a_i}')
+            if real_s_i[a_i] == 1:
+                # update s
+                next_s_i = s_i.copy()
+                next_s_i[a_i] = 1
+            else:
+                next_s_i = s_i.copy()
+                next_s_i[a_i] = 0
+            if j == m_questions-1:
+                # compute error
+                s_predict = next_s_i.copy()
+                s_predict = imputer.transform(np.array([s_predict]))[0]
+                # round
+                s_predict = np.round(s_predict)
+                error = -np.mean(np.abs(s_predict - real_s_i))
+                error_greedy_list.append(error)
+            s_i = next_s_i
+    # compute mean error for all people
+    error_greedy = np.mean(error_greedy_list)
+    return error_greedy
 
 def main():
 
@@ -264,7 +265,7 @@ def main():
     # parameters
     n_questions = 4
     m_questions = 2
-    train_size = 0.2
+    train_size = 0.06
     k_neighbors = 3
 
     # only take the first N columns
@@ -471,7 +472,7 @@ def main():
                     if j == m_questions-1:
                         # persona i print
 
-                        
+                        ### change error to real error ###
                         if verbose2: print(f'Predict vals {s_predict_i}')
                         if verbose2: print(f'Real s {real_s_i}')
                         r_i = -np.mean(np.abs(s_predict_i - real_s_i))
@@ -496,8 +497,10 @@ def main():
             plt.figure()
             plt.plot(error_list)
             # add greedy error to plot
-            plt.axhline(y=error_greedy, color='r', linestyle='--')
+            plt.axhline(y=error_greedy, color='r', linestyle='--', label='Greedy 0')
             plt.title('Error until episode ' + str(ep))
+            plt.xlabel(f'Episode (once every {refresh_target_network_freq})')
+            plt.ylabel('Mean reward')
             # name file with parameters
             plt.savefig(f'output/error_list_E{episodes}_M{m_questions}_N{n_questions}_ts{train_size}.png')
             plt.close()

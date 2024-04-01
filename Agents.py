@@ -34,6 +34,7 @@ def get_model_value(input_shape, lr):
     return model
 
 
+'''This one is not so good, check what it does'''
 class MonteCarloG:
 
     def __init__(self, state_shape, n_actions, learning_rate, gamma):
@@ -67,10 +68,7 @@ class MonteCarloG:
     def save_model(self, name):
         self.model.save(f'saved_models/{name}')
 
-
-
-
-
+'''This one is not so good, check what it does'''
 class MonteCarloG_baseline:
 
     def __init__(self, state_shape, n_actions, learning_rate, gamma):
@@ -126,7 +124,7 @@ def get_model_statevalue_v2(input_shape, output, lr):
     model.compile(optimizer=tf.keras.optimizers.Adam(lr))
     return model
 
-
+'''This one is not so good, check what it does'''
 class MonteCarloG_statevalue:
 
     def __init__(self, state_shape, n_actions, learning_rate, gamma, epsilon):
@@ -179,7 +177,10 @@ class MonteCarloG_statevalue:
         self.model_policy.save(f'saved_models/{name}')
 
 
-
+''' This one is good
+The NN receives as an input the state (whatever you want) 
+and outputs the Q values for each action (expected reward from the expected state you would get with that action)
+'''
 class DQNAgent(nn.Module):
     def __init__(self, state_shape, n_actions, epsilon=0):
 
@@ -191,14 +192,18 @@ class DQNAgent(nn.Module):
         state_dim = state_shape[0]
         # a simple NN with state_dim as input vector (inout is state s)
         # and self.n_actions as output vector of logits of q(s, a)
+        # self.network = nn.Sequential()
+        # self.network.add_module('layer1', nn.Linear(state_dim, 192))
+        # self.network.add_module('relu1', nn.ReLU())
+        # self.network.add_module('layer2', nn.Linear(192, 256))
+        # self.network.add_module('relu2', nn.ReLU())
+        # self.network.add_module('layer3', nn.Linear(256, 64))
+        # self.network.add_module('relu3', nn.ReLU())
+        # self.network.add_module('layer4', nn.Linear(64, n_actions))
         self.network = nn.Sequential()
-        self.network.add_module('layer1', nn.Linear(state_dim, 192))
-        self.network.add_module('relu1', nn.ReLU())
-        self.network.add_module('layer2', nn.Linear(192, 256))
-        self.network.add_module('relu2', nn.ReLU())
-        self.network.add_module('layer3', nn.Linear(256, 64))
+        self.network.add_module('layer1', nn.Linear(state_dim, 100))
         self.network.add_module('relu3', nn.ReLU())
-        self.network.add_module('layer4', nn.Linear(64, n_actions))
+        self.network.add_module('layer4', nn.Linear(100, n_actions))
         # 
         self.parameters = self.network.parameters
         
