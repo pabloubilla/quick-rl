@@ -221,14 +221,14 @@ def compute_td_loss(agent, target_network, states, actions, rewards, next_states
 def epsilon_schedule(start_eps, end_eps, step, final_step):
     return start_eps + (end_eps-start_eps)*min(step, final_step)/final_step
 
-def greedy_0(imputer, train, m_questions):
+def greedy_0(imputer, train, T_questions):
     # test error using a greedy 0 policy
-    n_questions = train.shape[1]
+    N_questions = train.shape[1]
     error_greedy_list = []
     for person_i in range(train.shape[0]):
         real_s_i = train.iloc[person_i].values
-        s_i = np.nan*np.ones(n_questions)
-        for j in range(m_questions):
+        s_i = np.nan*np.ones(N_questions)
+        for j in range(T_questions):
             probs_ij = imputer.transform(np.array([s_i]))[0]
             # compute variance
             var_ij = probs_ij*(1-probs_ij)
@@ -243,18 +243,21 @@ def greedy_0(imputer, train, m_questions):
             else:
                 next_s_i = s_i.copy()
                 next_s_i[a_i] = 0
-            if j == m_questions-1:
+            if j == T_questions-1:
                 # compute error
                 s_predict = next_s_i.copy()
                 s_predict = imputer.transform(np.array([s_predict]))[0]
                 # round
                 s_predict = np.round(s_predict)
-                error = -np.mean(np.abs(s_predict - real_s_i))
+                error = -np.sum(np.abs(s_predict - real_s_i))/(N_questions-T_questions)
                 error_greedy_list.append(error)
             s_i = next_s_i
     # compute mean error for all people
     error_greedy = np.mean(error_greedy_list)
     return error_greedy
+
+
+### add play and record function
 
 def main():
 
@@ -263,13 +266,14 @@ def main():
     df_complete = pandas.read_csv('data/data_complete.csv', index_col=0, sep=',')
 
     # parameters
-    n_questions = 4
-    m_questions = 2
-    train_size = 0.06
-    k_neighbors = 3
+    N_questions = 7
+    T_questions = 4
+    train_size = 0.4
+    k_neighbors = 8
+    reward_every_question = True
 
     # only take the first N columns
-    df_complete = df_complete.iloc[:, :n_questions]
+    df_complete = df_complete.iloc[:, :N_questions]
 
 
     # separate into train and test randomly
@@ -282,27 +286,27 @@ def main():
 
 
     # test error using a greedy 0 policy
-    error_greedy = greedy_0(imputer, train, m_questions)
+    error_greedy = greedy_0(imputer, train, T_questions)
 
 
     verbose = False
-    verbose2 = True
+    verbose2 = False
 
     # state_shape = (n_questions,)
-    state_shape = (2*n_questions,)
+    state_shape = (2*N_questions,)
 
     # define agent
-    agent = DQNAgent(state_shape, n_questions, epsilon=0.5).to('cpu')
-    target_network = DQNAgent(state_shape, n_questions, epsilon=0.5).to('cpu')
+    agent = DQNAgent(state_shape, N_questions, epsilon=0.5).to('cpu')
+    target_network = DQNAgent(state_shape, N_questions, epsilon=0.5).to('cpu')
     target_network.load_state_dict(agent.state_dict())
 
     #setup some parameters for training
-    timesteps_per_epoch = 1
-    batch_size = 32
+    timesteps_per_epoch = 50
+    batch_size = 200
     total_steps = 5 * 10**4
 
     # number of episodes
-    episodes = 20000
+    episodes = 2000
 
 
     #init Optimizer
@@ -310,13 +314,15 @@ def main():
 
     # set exploration epsilon 
     start_epsilon = 0.4
-    end_epsilon = 0.0001
+    end_epsilon = 0.001
     eps_decay_final_step = int(episodes/2)
 
     # setup spme frequency for loggind and updating target network
     # I'm not super sure what these are for
     loss_freq = 200
-    refresh_target_network_freq = 200
+    refresh_target_network_freq = 50
+    initial_buffer_size = 1000
+    max_buffer_size = 1100
     # eval_freq = 1000
 
     # smoothing window for the reward curve
@@ -330,107 +336,190 @@ def main():
     td_loss_history = []
     error_list = []
 
+
+    s_batch = []
+    a_batch = []
+    r_batch = []
+    next_s_batch = []
+    done_batch = []
+    for _ in range(initial_buffer_size):
+        real_s = train.sample().values[0]
+        s = np.nan*np.ones(N_questions)
+        answered = np.zeros(N_questions)
+        state = np.concatenate([imputer.transform(np.array([s]))[0], answered])
+        for i in range(T_questions):
+            qvalues = agent.get_qvalues([state])
+            a = agent.sample_actions(qvalues)[0]
+            if real_s[a] == 1:
+                next_s = s.copy()
+                next_s[a] = 1
+            else:
+                next_s = s.copy()
+                next_s[a] = 0
+            next_answered = answered.copy()
+            next_answered[a] = 1
+            s_predict = next_s.copy()
+            s_predict = imputer.transform(np.array([s_predict]))[0]
+            s_predict = np.round(s_predict)
+            if reward_every_question and i < T_questions - 1:
+                r = (0.99**(N_questions-i))*-np.sum(np.abs(s_predict - real_s))/(N_questions-i+1)
+            else: 
+                r = 0
+            if i == T_questions-1:
+                r = -np.sum(np.abs(s_predict - real_s))/(N_questions-T_questions)
+                done = True
+            else:
+                done = False
+            next_state = np.concatenate([s_predict, next_answered])
+            s_batch.append(state)
+            a_batch.append(a)
+            r_batch.append(r)
+            next_s_batch.append(next_state)
+            done_batch.append(done)
+            state = next_state
+            s = next_s
+            answered = next_answered
+
+
+
+
     # run episodes
     for ep in range(episodes):
         if verbose: print(f'Episode {ep}')
         # reduce exploration as we progress
         agent.epsilon = epsilon_schedule(start_epsilon, end_epsilon, ep, eps_decay_final_step)
 
-        # initial s is each question is np.nan
-        s = np.nan*np.ones(n_questions)
-
-        # initial s_p
-        s_p = imputer.transform(np.array([s]))[0]
-        # initial answered
-        answered = np.zeros(n_questions)
-
-        # state is a vector that joins them 3
-        state = np.concatenate([s_p, answered]) # this probably doesnt work, could just be s_p instead
-
-        # maybe state can be current prediction
-        # s_p = imputer.transform(np.array([s]))[0]
-
-        # real_s is one random person from training
-        real_s = train.sample().values[0]
-
-        # done flag
-        done = False
+        # define lists to store batch
         s_list = []
-        r_list = []
         a_list = []
+        r_list = []
         next_s_list = []
         done_list = []
-        # iterate over questions to ask
-        for i in range(m_questions):
-            # print current state
-            if verbose: print('-'*10)
-            # if verbose: print(f'Question {i}')
-            # if verbose: print(f'State {state}')
-            
-            # select action
-            qvalues = agent.get_qvalues([state])
-            a = agent.sample_actions(qvalues)[0]
 
-            # update s with the answer
-            if real_s[a] == 1:
-                # update s
-                next_s = s.copy()
-                next_s[a] = 1
-            else:
-                next_s = s.copy()
-                next_s[a] = 0
+        for batch in range(timesteps_per_epoch):
 
-            next_answered = answered.copy()
-            next_answered[a] = 1
+            # initial s is each question is np.nan
+            s = np.nan*np.ones(N_questions)
 
-            # create copy of s for prediction
-            s_predict = next_s.copy()
-            # # change 0 for nan
-            # s_predict[s_predict == 0] = np.nan
-            # # change -1 for 0
-            # s_predict[s_predict == -1] = 0
-            # predict using imputer
-            s_predict = imputer.transform(np.array([s_predict]))[0]
-            next_s_p = s_predict.copy()
+            # initial s_p
+            s_p = imputer.transform(np.array([s]))[0]
+            # initial answered
+            answered = np.zeros(N_questions)
 
-            # if verbose: print(f'Predict probs {s_predict}')
-            # round prediction
-            s_predict = np.round(s_predict)
+            # state is a vector that joins them 3
+            state = np.concatenate([s_p, answered]) # this probably doesnt work, could just be s_p instead
 
-            # by default reward is 0
-            r = 0
-            # if last question compute reward
-            if i == m_questions-1:
-                if verbose: print(f'Predict vals {s_predict}')
-                if verbose: print(f'Real s {real_s}')
-                r = -np.mean(np.abs(s_predict - real_s))
-                if verbose: print(f'Reward {r}')
-                done = True
+            # maybe state can be current prediction
+            # s_p = imputer.transform(np.array([s]))[0]
 
-            # create next state
-            next_state = np.concatenate([next_s_p, next_answered])
-            
-            # append to lists
-            s_list.append(state)
-            a_list.append(a)
-            r_list.append(r)
-            next_s_list.append(next_state)
-            done_list.append(done)
+            # real_s is one random person from training
+            real_s = train.sample().values[0]
 
-            # update state
-            state = next_state
-            # update state
-            s = next_s
+            # done flag
+            done = False
+            # s_list = []
+            # r_list = []
+            # a_list = []
+            # next_s_list = []
+            # done_list = []
+
+            # iterate over questions to ask
+            for i in range(T_questions):
+                # print current state
+                if verbose: print('-'*10)
+                # if verbose: print(f'Question {i}')
+                # if verbose: print(f'State {state}')
+                
+                # select action
+                qvalues = agent.get_qvalues([state])
+                a = agent.sample_actions(qvalues)[0]
+
+                # update s with the answer
+                if real_s[a] == 1:
+                    # update s
+                    next_s = s.copy()
+                    next_s[a] = 1
+                else:
+                    next_s = s.copy()
+                    next_s[a] = 0
+
+                next_answered = answered.copy()
+                next_answered[a] = 1
+
+                # create copy of s for prediction
+                s_predict = next_s.copy()
+                # # change 0 for nan
+                # s_predict[s_predict == 0] = np.nan
+                # # change -1 for 0
+                # s_predict[s_predict == -1] = 0
+                # predict using imputer
+                s_predict = imputer.transform(np.array([s_predict]))[0]
+                next_s_p = s_predict.copy()
+
+                # if verbose: print(f'Predict probs {s_predict}')
+                # round prediction
+                s_predict = np.round(s_predict)
+
+                # compute rewarding depending on reward_every_question
+                if reward_every_question and i < T_questions - 1:
+                    r = (0.99**(N_questions-i))*-np.sum(np.abs(s_predict - real_s))/(N_questions-i+1)
+                else: 
+                    r = 0
+                # if last question compute reward
+                if i == T_questions-1:
+                    if verbose: print(f'Predict vals {s_predict}')
+                    if verbose: print(f'Real s {real_s}')
+                    r = -np.sum(np.abs(s_predict - real_s))/(N_questions-T_questions)
+                    if verbose: print(f'Reward {r}')
+                    done = True
+
+                # create next state
+                next_state = np.concatenate([next_s_p, next_answered])
+                
+                # append to lists
+                s_list.append(state)
+                a_list.append(a)
+                r_list.append(r)
+                next_s_list.append(next_state)
+                done_list.append(done)
+
+                # update state
+                state = next_state
+                # update state
+                s = next_s
+
+        # extend buffers
+        s_batch.extend(s_list)
+        a_batch.extend(a_list)
+        r_batch.extend(r_list)
+        next_s_batch.extend(next_s_list)
+        done_batch.extend(done_list)
+        # clip to max
+        if len(s_batch) > max_buffer_size:
+            s_batch = s_batch[-max_buffer_size:]
+            a_batch = a_batch[-max_buffer_size:]
+            r_batch = r_batch[-max_buffer_size:]
+            next_s_batch = next_s_batch[-max_buffer_size:]
+            done_batch = done_batch[-max_buffer_size:]
 
         # all to array
-        s_list = np.array(s_list)
-        a_list = np.array(a_list)
-        r_list = np.array(r_list)
-        next_s_list = np.array(next_s_list)
-        done_list = np.array(done_list)
+        # s_list = np.array(s_list)
+        # a_list = np.array(a_list)
+        # r_list = np.array(r_list)
+        # next_s_list = np.array(next_s_list)
+        # done_list = np.array(done_list)
+
+        # sample from batch
+        indices = np.random.choice(len(s_batch), batch_size)
+        s_array = np.array(s_batch)[indices]
+        a_array = np.array(a_batch)[indices]
+        r_array = np.array(r_batch)[indices]
+        next_s_array = np.array(next_s_batch)[indices]
+        done_array = np.array(done_batch)[indices]
+
 
         loss = compute_td_loss(agent, target_network, 
-                           s_list, a_list, r_list, next_s_list, done_list,                  
+                           s_array, a_array, r_array, next_s_array, done_array,                  
                            gamma=0.99,
                            device='cpu')
         
@@ -447,10 +536,10 @@ def main():
             for person_i in range(train.shape[0]):
                 if verbose2: print(f'Persona {person_i}')
                 real_s_i = train.iloc[person_i].values
-                s_i = np.nan*np.ones(n_questions)
-                answered_i = np.zeros(n_questions)
+                s_i = np.nan*np.ones(N_questions)
+                answered_i = np.zeros(N_questions)
                 state_i = np.concatenate([imputer.transform(np.array([s_i]))[0], answered_i])
-                for j in range(m_questions):
+                for j in range(T_questions):
                     qvalues_i = agent.get_qvalues([state_i])
                     # choose best arg for qvalues
                     a_i = qvalues_i.argmax()
@@ -469,19 +558,19 @@ def main():
                     s_predict_i = imputer.transform(np.array([s_predict_i]))[0]
                     # round
                     s_predict_i = np.round(s_predict_i)
-                    if j == m_questions-1:
+                    if j == T_questions-1:
                         # persona i print
 
-                        ### change error to real error ###
+                       
                         if verbose2: print(f'Predict vals {s_predict_i}')
                         if verbose2: print(f'Real s {real_s_i}')
-                        r_i = -np.mean(np.abs(s_predict_i - real_s_i))
+                        r_i = -np.sum(np.abs(s_predict_i - real_s_i))/(N_questions-T_questions)
                         if verbose2: print(f'Reward {r_i}')
                         if verbose2: print('-'*10)
                     else:
                         r_i = 0
 
-                    if j == m_questions-1:
+                    if j == T_questions-1:
                         done_i = True
                     else:
                         done_i = False
@@ -498,11 +587,12 @@ def main():
             plt.plot(error_list)
             # add greedy error to plot
             plt.axhline(y=error_greedy, color='r', linestyle='--', label='Greedy 0')
+            plt.legend()
             plt.title('Error until episode ' + str(ep))
             plt.xlabel(f'Episode (once every {refresh_target_network_freq})')
             plt.ylabel('Mean reward')
             # name file with parameters
-            plt.savefig(f'output/error_list_E{episodes}_M{m_questions}_N{n_questions}_ts{train_size}.png')
+            plt.savefig(f'output/error_list_E{episodes}_M{T_questions}_N{N_questions}_ts{train_size}.png')
             plt.close()
 
         # 
@@ -525,7 +615,7 @@ def main():
                 plt.plot(mean_rw_history_partial)
                 plt.title('Mean reward until episode ' + str(ep))
                 # name file with parameters
-                plt.savefig(f'output/mean_rw_history_E{episodes}_M{m_questions}_N{n_questions}_ts{train_size}.png')
+                plt.savefig(f'output/mean_rw_history_E{episodes}_M{T_questions}_N{N_questions}_ts{train_size}.png')
                 plt.close()
                 # next plot
                 
