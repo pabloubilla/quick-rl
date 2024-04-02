@@ -266,9 +266,9 @@ def main():
     df_complete = pandas.read_csv('data/data_complete.csv', index_col=0, sep=',')
 
     # parameters
-    N_questions = 7
-    T_questions = 4
-    train_size = 0.4
+    N_questions = 15
+    T_questions = 6
+    train_size = 0.5
     k_neighbors = 8
     reward_every_question = True
 
@@ -301,12 +301,12 @@ def main():
     target_network.load_state_dict(agent.state_dict())
 
     #setup some parameters for training
-    timesteps_per_epoch = 50
-    batch_size = 200
+    timesteps_per_epoch = 10
+    batch_size = 60
     total_steps = 5 * 10**4
 
     # number of episodes
-    episodes = 2000
+    episodes = 4000
 
 
     #init Optimizer
@@ -319,7 +319,7 @@ def main():
 
     # setup spme frequency for loggind and updating target network
     # I'm not super sure what these are for
-    loss_freq = 200
+    loss_freq = 20
     refresh_target_network_freq = 50
     initial_buffer_size = 1000
     max_buffer_size = 1100
