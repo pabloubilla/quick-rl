@@ -201,9 +201,11 @@ class DQNAgent(nn.Module):
         # self.network.add_module('relu3', nn.ReLU())
         # self.network.add_module('layer4', nn.Linear(64, n_actions))
         self.network = nn.Sequential()
-        self.network.add_module('layer1', nn.Linear(state_dim, 100))
+        self.network.add_module('layer1', nn.Linear(state_dim, 50))
         self.network.add_module('relu3', nn.ReLU())
-        self.network.add_module('layer4', nn.Linear(100, n_actions))
+        self.network.add_module('layer2', nn.Linear(50, 50))
+        self.network.add_module('relu3', nn.ReLU())
+        self.network.add_module('layer4', nn.Linear(50, n_actions))
         # 
         self.parameters = self.network.parameters
         
@@ -214,6 +216,7 @@ class DQNAgent(nn.Module):
 
     def get_qvalues(self, states):
         # input is an array of states in numpy and outout is Qvals as numpy array
+        states = np.array(states, dtype=np.float32)
         states = torch.tensor(states, device='cpu', dtype=torch.float32)
         qvalues = self.forward(states)
         return qvalues.data.cpu().numpy()
@@ -227,3 +230,28 @@ class DQNAgent(nn.Module):
         should_explore = np.random.choice(
             [0, 1], batch_size, p=[1-epsilon, epsilon])
         return np.where(should_explore, random_actions, best_actions)
+    
+
+'''ReplayBuffer in order to store samples to learn without autocorrelation'''
+class ReplayBuffer:
+    def __init__(self, size):
+        self.size = size #max number of items in buffer
+        self.buffer =[] #array to holde buffer
+        self.next_id = 0
+    
+    def __len__(self):
+        return len(self.buffer)
+    
+    def add(self, state, action, reward, next_state, done):
+        item = (state, action, reward, next_state, done)
+        if len(self.buffer) < self.size:
+           self.buffer.append(item)
+        else:
+            self.buffer[self.next_id] = item
+        self.next_id = (self.next_id + 1) % self.size
+        
+    def sample(self, batch_size):
+        idxs = np.random.choice(len(self.buffer), batch_size)
+        samples = [self.buffer[i] for i in idxs]
+        states, actions, rewards, next_states, done_flags = list(zip(*samples))
+        return np.array(states), np.array(actions), np.array(rewards), np.array(next_states), np.array(done_flags)
