@@ -8,7 +8,8 @@ import torch.nn as nn
 from sklearn.model_selection import train_test_split
 from sklearn.impute import KNNImputer
 import matplotlib.pyplot as plt
-
+import itertools
+from multiprocessing import Pool
 
 # def run_repetitions(rl_method, n_repetitions, n_episodes, smoothing_window, learning_rate, gamma, max_steps):
 #     print(f'Running {rl_method}')
@@ -259,7 +260,15 @@ def greedy_0(imputer, train, T_questions):
 
 ### add play and record function
 
-def main():
+def run_experiment(params):
+    # Unpack parameters and run the RL simulation
+    error = run_RL(**params)
+    # Return a dictionary with the results
+    result_dict = params.copy()
+    result_dict['error'] = error
+    return result_dict
+
+def run_RL(k_neighbors = 8, lr = 3e-1, batch_size = 32, start_epsilon = 0.2):
 
     # read data/df_turkey.csv
     # df_turkey = pandas.read_csv('data/df_turkey.csv', index_col=0, sep=';')
@@ -269,15 +278,17 @@ def main():
     N_questions = 15
     T_questions = 6
     train_size = 0.5
-    k_neighbors = 8
-    reward_every_question = True
+    # k_neighbors = 8
+    reward_every_question = False
+    # lr = 5e-4
+    batch_size = 32
 
     # only take the first N columns
     df_complete = df_complete.iloc[:, :N_questions]
 
 
     # separate into train and test randomly
-    train, test = train_test_split(df_complete, test_size=1-train_size)
+    train, test = train_test_split(df_complete, test_size=1-train_size, random_state=32)
 
 
     # train a KNNImputer on train
@@ -302,19 +313,19 @@ def main():
 
     #setup some parameters for training
     timesteps_per_epoch = 10
-    batch_size = 60
+    # batch_size = 32
     total_steps = 5 * 10**4
 
     # number of episodes
-    episodes = 4000
+    episodes = 1000
 
 
     #init Optimizer
-    opt = torch.optim.Adam(agent.parameters(), lr=1e-3)
+    opt = torch.optim.Adam(agent.parameters(), lr=lr)
 
     # set exploration epsilon 
-    start_epsilon = 0.4
-    end_epsilon = 0.001
+    # start_epsilon = 0.4
+    end_epsilon = 0.01
     eps_decay_final_step = int(episodes/2)
 
     # setup spme frequency for loggind and updating target network
@@ -584,15 +595,30 @@ def main():
             error_list.append(error/train.shape[0])
             # plot error_list
             plt.figure()
-            plt.plot(error_list)
+            plt.plot(error_list, label = '-MAE')
             # add greedy error to plot
             plt.axhline(y=error_greedy, color='r', linestyle='--', label='Greedy 0')
+    
+            # Adding an annotation with the parameters
+            param_text = (f'Parameters:\n'
+                        f'LR: {lr}\n'
+                        f'Batch Size: {batch_size}\n'
+                        f'K-Neighb: {k_neighbors}\n'
+                        f'Start Eps: {start_epsilon}')
+
+            # Place the text box in upper left in axes coords
+            props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
+            plt.gca().text(0.05, 0.95, param_text, transform=plt.gca().transAxes, fontsize=10,
+                        verticalalignment='top', bbox=props)
+            
+            # Finish up setting the plot
             plt.legend()
             plt.title('Error until episode ' + str(ep))
             plt.xlabel(f'Episode (once every {refresh_target_network_freq})')
             plt.ylabel('Mean reward')
+
             # name file with parameters
-            plt.savefig(f'output/error_list_E{episodes}_M{T_questions}_N{N_questions}_ts{train_size}.png')
+            plt.savefig(f'output/error_list_E{episodes}_M{T_questions}_N{N_questions}_ts{train_size}_lr{lr}_bath_size{batch_size}.png')
             plt.close()
 
         # 
@@ -617,10 +643,66 @@ def main():
                 # name file with parameters
                 plt.savefig(f'output/mean_rw_history_E{episodes}_M{T_questions}_N{N_questions}_ts{train_size}.png')
                 plt.close()
-                # next plot
-                
+                # next plot        
+    return error_list[-1]
 
-   
+
+def main():
+
+    parallel = True 
+
+    # parameter grid
+    # param_grid = {'k_neighbors': [8, 10, 12], 
+    #               'lr': [1e-1, 3e-1, 5e-1], 
+    #               'batch_size': [32, 64], 
+    #               'start_epsilon': [0.1, 0.4, 0.6]}
+    param_grid = {'k_neighbors': [8], 
+                  'lr': [1e-3, 1e-4]}
+
+
+    # for storing results
+    results = []
+
+    # Create a list of all parameter names and their corresponding lists of values
+    param_keys, param_values = zip(*param_grid.items())
+
+    # Use itertools.product to generate all combinations of parameter param_values
+    combinations = [dict(zip(param_keys, v)) for v in itertools.product(*param_values)]
+
+    if parallel:
+        with Pool() as pool:
+            results = pool.map(run_experiment, combinations)
+
+
+
+    else:
+        # iterate over parameter grid
+        for params in combinations:
+            print(params)
+            # run RL
+            error = run_RL(**params)
+            
+            # save results in dictionary to append to results list
+            results_dict = params.copy()
+            results_dict['error'] = error
+
+            results.append(results_dict)
+    
+    # save results
+    results_df = pandas.DataFrame(results)
+
+    results_df.to_csv('output/results.csv')
+
+
+        
+        # save error
+        # save error with parameters
+
+    # iterate over every parameter grid combination with only one for loop
+
+
+    # iterate over parameter grid
+
 
 # def main_old():
 #     # env = FrameStack(ResizeObservation(GrayScaleObservation(SkipFrame(env, n_frames=4)), shape=84), num_stack=4)
