@@ -317,7 +317,7 @@ def run_RL(k_neighbors = 8, lr = 3e-1, batch_size = 32, start_epsilon = 0.2):
     total_steps = 5 * 10**4
 
     # number of episodes
-    episodes = 2000
+    episodes = 4000
 
 
     #init Optimizer
@@ -619,7 +619,7 @@ def run_RL(k_neighbors = 8, lr = 3e-1, batch_size = 32, start_epsilon = 0.2):
             plt.ylabel('Mean reward')
 
             # name file with parameters
-            plt.savefig(f'output/error_list_E{episodes}_M{T_questions}_N{N_questions}_ts{train_size}_lr{lr}_bath_size{batch_size}.png')
+            plt.savefig(f'output/error_list_E{episodes}_M{T_questions}_N{N_questions}_ts{train_size}_lr{lr}_batch_size{batch_size}_epsilon{start_epsilon}_kneigh{k_neighbors}.png')
             plt.close()
 
         # 
@@ -650,17 +650,17 @@ def run_RL(k_neighbors = 8, lr = 3e-1, batch_size = 32, start_epsilon = 0.2):
 
 def main():
 
-    parallel = False
+    parallel = True
 
     # parameter grid
     # param_grid = {'k_neighbors': [8, 10, 12], 
     #               'lr': [1e-1, 3e-1, 5e-1], 
     #               'batch_size': [32, 64], 
     #               'start_epsilon': [0.1, 0.4, 0.6]}
-    param_grid = {'k_neighbors': [7, 15], 
-                  'lr': [1e-3, 1e-4],
+    param_grid = {'k_neighbors': [7], 
+                  'lr': [1e-3, 1e-4,5e-5],
                   'batch_size': [32, 64],
-                  'start_epsilon': [0.1, 0.4]}
+                  'start_epsilon': [0.4,0.6]}
 
 
     # for storing results
