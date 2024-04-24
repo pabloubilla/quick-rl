@@ -289,7 +289,7 @@ def run_RL(k_neighbors = 8, lr = 3e-1, batch_size = 32, start_epsilon = 0.2):
 
     # separate into train and test randomly
     train, test = train_test_split(df_complete, test_size=1-train_size, random_state=32)
-
+    number_of_people = train.shape[0]
 
     # train a KNNImputer on train
     imputer = KNNImputer(n_neighbors=k_neighbors)
@@ -317,7 +317,7 @@ def run_RL(k_neighbors = 8, lr = 3e-1, batch_size = 32, start_epsilon = 0.2):
     total_steps = 5 * 10**4
 
     # number of episodes
-    episodes = 1000
+    episodes = 2000
 
 
     #init Optimizer
@@ -595,7 +595,7 @@ def run_RL(k_neighbors = 8, lr = 3e-1, batch_size = 32, start_epsilon = 0.2):
             error_list.append(error/train.shape[0])
             # plot error_list
             plt.figure()
-            plt.plot(error_list, label = '-MAE')
+            plt.plot(error_list, label = 'RL')
             # add greedy error to plot
             plt.axhline(y=error_greedy, color='r', linestyle='--', label='Greedy 0')
     
@@ -604,7 +604,8 @@ def run_RL(k_neighbors = 8, lr = 3e-1, batch_size = 32, start_epsilon = 0.2):
                         f'LR: {lr}\n'
                         f'Batch Size: {batch_size}\n'
                         f'K-Neighb: {k_neighbors}\n'
-                        f'Start Eps: {start_epsilon}')
+                        f'Start Eps: {start_epsilon}\n'
+                        f'N People: {number_of_people}\n')
 
             # Place the text box in upper left in axes coords
             props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
@@ -649,15 +650,17 @@ def run_RL(k_neighbors = 8, lr = 3e-1, batch_size = 32, start_epsilon = 0.2):
 
 def main():
 
-    parallel = True 
+    parallel = False
 
     # parameter grid
     # param_grid = {'k_neighbors': [8, 10, 12], 
     #               'lr': [1e-1, 3e-1, 5e-1], 
     #               'batch_size': [32, 64], 
     #               'start_epsilon': [0.1, 0.4, 0.6]}
-    param_grid = {'k_neighbors': [8], 
-                  'lr': [1e-3, 1e-4]}
+    param_grid = {'k_neighbors': [7, 15], 
+                  'lr': [1e-3, 1e-4],
+                  'batch_size': [32, 64],
+                  'start_epsilon': [0.1, 0.4]}
 
 
     # for storing results
@@ -746,4 +749,6 @@ def main():
 
 
 if __name__ == '__main__':
+    # set random seed
+    np.random.seed(32)
     main()

@@ -201,11 +201,13 @@ class DQNAgent(nn.Module):
         # self.network.add_module('relu3', nn.ReLU())
         # self.network.add_module('layer4', nn.Linear(64, n_actions))
         self.network = nn.Sequential()
-        self.network.add_module('layer1', nn.Linear(state_dim, int(3*state_dim)))
+        self.network.add_module('layer1', nn.Linear(state_dim, int(state_dim)))
+        self.network.add_module('relu3', nn.ReLU())
+        self.network.add_module('layer1', nn.Linear(state_dim, int(state_dim)))
         self.network.add_module('relu3', nn.ReLU())
         # self.network.add_module('layer2', nn.Linear(50, 50))
         # self.network.add_module('relu3', nn.ReLU())
-        self.network.add_module('layer4', nn.Linear(int(3*state_dim), n_actions))
+        self.network.add_module('layer4', nn.Linear(int(state_dim), n_actions))
         # 
         self.parameters = self.network.parameters
         
