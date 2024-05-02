@@ -289,15 +289,17 @@ def run_RL(k_neighbors = 8, lr = 3e-1, batch_size = 32, start_epsilon = 0.2):
 
     # separate into train and test randomly
     train, test = train_test_split(df_complete, test_size=1-train_size, random_state=32)
-    number_of_people = train.shape[0]
+    # separate train into train_probs and train_rl
+    train_probs, train_rl = train_test_split(train, test_size=0.5, random_state=32)
+    number_of_people = train_rl.shape[0]
 
     # train a KNNImputer on train
     imputer = KNNImputer(n_neighbors=k_neighbors)
-    imputer.fit(train.to_numpy())
+    imputer.fit(train_probs.to_numpy())
 
 
     # test error using a greedy 0 policy
-    error_greedy = greedy_0(imputer, train, T_questions)
+    error_greedy = greedy_0(imputer, test, T_questions)
 
 
     verbose = False
@@ -312,12 +314,11 @@ def run_RL(k_neighbors = 8, lr = 3e-1, batch_size = 32, start_epsilon = 0.2):
     target_network.load_state_dict(agent.state_dict())
 
     #setup some parameters for training
-    timesteps_per_epoch = 10
-    # batch_size = 32
+    timesteps_per_epoch = 1
     total_steps = 5 * 10**4
 
     # number of episodes
-    episodes = 4000
+    episodes = int(5*10**4)
 
 
     #init Optimizer
@@ -325,13 +326,13 @@ def run_RL(k_neighbors = 8, lr = 3e-1, batch_size = 32, start_epsilon = 0.2):
 
     # set exploration epsilon 
     # start_epsilon = 0.4
-    end_epsilon = 0.01
+    end_epsilon = 0.05
     eps_decay_final_step = int(episodes/2)
 
     # setup spme frequency for loggind and updating target network
     # I'm not super sure what these are for
     loss_freq = 20
-    refresh_target_network_freq = 50
+    refresh_target_network_freq = 500 ## MAYBE CHANGE THIS ONE (TO LESS FREQUENTLY)
     initial_buffer_size = 1000
     max_buffer_size = 1100
     # eval_freq = 1000
@@ -354,7 +355,7 @@ def run_RL(k_neighbors = 8, lr = 3e-1, batch_size = 32, start_epsilon = 0.2):
     next_s_batch = []
     done_batch = []
     for _ in range(initial_buffer_size):
-        real_s = train.sample().values[0]
+        real_s = train_rl.sample().values[0]
         s = np.nan*np.ones(N_questions)
         answered = np.zeros(N_questions)
         state = np.concatenate([imputer.transform(np.array([s]))[0], answered])
@@ -424,7 +425,7 @@ def run_RL(k_neighbors = 8, lr = 3e-1, batch_size = 32, start_epsilon = 0.2):
             # s_p = imputer.transform(np.array([s]))[0]
 
             # real_s is one random person from training
-            real_s = train.sample().values[0]
+            real_s = train_rl.sample().values[0]
 
             # done flag
             done = False
@@ -544,9 +545,9 @@ def run_RL(k_neighbors = 8, lr = 3e-1, batch_size = 32, start_epsilon = 0.2):
         if ep % refresh_target_network_freq == 0:
             # iterate train
             error = 0
-            for person_i in range(train.shape[0]):
+            for person_i in range(test.shape[0]):
                 if verbose2: print(f'Persona {person_i}')
-                real_s_i = train.iloc[person_i].values
+                real_s_i = test.iloc[person_i].values
                 s_i = np.nan*np.ones(N_questions)
                 answered_i = np.zeros(N_questions)
                 state_i = np.concatenate([imputer.transform(np.array([s_i]))[0], answered_i])
@@ -619,7 +620,7 @@ def run_RL(k_neighbors = 8, lr = 3e-1, batch_size = 32, start_epsilon = 0.2):
             plt.ylabel('Mean reward')
 
             # name file with parameters
-            plt.savefig(f'output/error_list_E{episodes}_M{T_questions}_N{N_questions}_ts{train_size}_lr{lr}_batch_size{batch_size}_epsilon{start_epsilon}_kneigh{k_neighbors}.png')
+            plt.savefig(f'output/error_list_E{episodes}_M{T_questions}_N{N_questions}_ts{train_size}_lr{lr}_batch_size{batch_size}_epsilon{start_epsilon}_kneigh{k_neighbors}_refresh{refresh_target_network_freq}.png')
             plt.close()
 
         # 
@@ -650,17 +651,17 @@ def run_RL(k_neighbors = 8, lr = 3e-1, batch_size = 32, start_epsilon = 0.2):
 
 def main():
 
-    parallel = True
+    parallel = False
 
     # parameter grid
     # param_grid = {'k_neighbors': [8, 10, 12], 
     #               'lr': [1e-1, 3e-1, 5e-1], 
     #               'batch_size': [32, 64], 
     #               'start_epsilon': [0.1, 0.4, 0.6]}
-    param_grid = {'k_neighbors': [7], 
-                  'lr': [1e-3, 1e-4,5e-5],
-                  'batch_size': [32, 64],
-                  'start_epsilon': [0.4,0.6]}
+    param_grid = {'k_neighbors': [20], 
+                  'lr': [1e-4],
+                  'batch_size': [32],
+                  'start_epsilon': [0.4]}
 
 
     # for storing results
@@ -694,7 +695,7 @@ def main():
     # save results
     results_df = pandas.DataFrame(results)
 
-    results_df.to_csv('output/results.csv')
+    # results_df.to_csv('output/results.csv')
 
 
         
