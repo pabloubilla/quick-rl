@@ -11,6 +11,8 @@ import matplotlib.pyplot as plt
 import itertools
 from multiprocessing import Pool
 
+TF_ENABLE_ONEDNN_OPTS=0
+
 # def run_repetitions(rl_method, n_repetitions, n_episodes, smoothing_window, learning_rate, gamma, max_steps):
 #     print(f'Running {rl_method}')
 #     learning_curve = np.zeros(shape=(n_repetitions, n_episodes))
@@ -222,11 +224,13 @@ def compute_td_loss(agent, target_network, states, actions, rewards, next_states
 def epsilon_schedule(start_eps, end_eps, step, final_step):
     return start_eps + (end_eps-start_eps)*min(step, final_step)/final_step
 
-def greedy_0(imputer, train, T_questions):
+def greedy_0(imputer, train, T_questions, verbose = True):
     # test error using a greedy 0 policy
+    if verbose: print('Greedy 0')
     N_questions = train.shape[1]
     error_greedy_list = []
     for person_i in range(train.shape[0]):
+        if verbose: print(f'Person {person_i}')
         real_s_i = train.iloc[person_i].values
         s_i = np.nan*np.ones(N_questions)
         for j in range(T_questions):
@@ -236,6 +240,7 @@ def greedy_0(imputer, train, T_questions):
             # print(f'Variances {var_ij}')
             # choose the one with the highest variance
             a_i = np.argmax(var_ij)
+            if verbose: print(f'Question {j+1} is {a_i}')
             # print(f'Question {a_i}')
             if real_s_i[a_i] == 1:
                 # update s
@@ -270,14 +275,23 @@ def run_experiment(params):
 
 def run_RL(k_neighbors = 8, lr = 3e-1, batch_size = 32, start_epsilon = 0.2):
 
+    # verbose
+    verbose = False
+    verbose2 = True
+
     # read data/df_turkey.csv
     # df_turkey = pandas.read_csv('data/df_turkey.csv', index_col=0, sep=';')
-    df_complete = pandas.read_csv('data/data_complete.csv', index_col=0, sep=',')
+    # df_complete = pandas.read_csv('data/data_complete.csv', index_col=0, sep=',')
+    df_complete = pandas.read_csv('synthetic_data/synthetic_data_10_1000.csv', sep=',')
+
+    # output folder
+    output_folder = 'output_synthetic'
 
     # parameters
-    N_questions = 15
-    T_questions = 6
-    train_size = 0.5
+    # N_questions = 15
+    N_questions = df_complete.shape[1]
+    T_questions = int(N_questions/2)
+    train_size = 2/3
     # k_neighbors = 8
     reward_every_question = False
     # lr = 5e-4
@@ -291,7 +305,9 @@ def run_RL(k_neighbors = 8, lr = 3e-1, batch_size = 32, start_epsilon = 0.2):
     train, test = train_test_split(df_complete, test_size=1-train_size, random_state=32)
     # separate train into train_probs and train_rl
     train_probs, train_rl = train_test_split(train, test_size=0.5, random_state=32)
-    number_of_people = train_rl.shape[0]
+    rl_people = train_rl.shape[0]
+    test_people = test.shape[0]
+    total_people = df_complete.shape[0]
 
     # train a KNNImputer on train
     imputer = KNNImputer(n_neighbors=k_neighbors)
@@ -299,11 +315,7 @@ def run_RL(k_neighbors = 8, lr = 3e-1, batch_size = 32, start_epsilon = 0.2):
 
 
     # test error using a greedy 0 policy
-    error_greedy = greedy_0(imputer, test, T_questions)
-
-
-    verbose = False
-    verbose2 = False
+    error_greedy = greedy_0(imputer, test, T_questions, verbose=verbose2)
 
     # state_shape = (n_questions,)
     state_shape = (2*N_questions,)
@@ -361,6 +373,8 @@ def run_RL(k_neighbors = 8, lr = 3e-1, batch_size = 32, start_epsilon = 0.2):
         state = np.concatenate([imputer.transform(np.array([s]))[0], answered])
         for i in range(T_questions):
             qvalues = agent.get_qvalues([state])
+            index_answered = np.where(answered == 1)[0]
+            qvalues[0,index_answered] = -np.inf # don't ask the same question twice
             a = agent.sample_actions(qvalues)[0]
             if real_s[a] == 1:
                 next_s = s.copy()
@@ -391,7 +405,6 @@ def run_RL(k_neighbors = 8, lr = 3e-1, batch_size = 32, start_epsilon = 0.2):
             state = next_state
             s = next_s
             answered = next_answered
-
 
 
 
@@ -444,6 +457,8 @@ def run_RL(k_neighbors = 8, lr = 3e-1, batch_size = 32, start_epsilon = 0.2):
                 
                 # select action
                 qvalues = agent.get_qvalues([state])
+                index_answered = np.where(answered == 1)[0]
+                qvalues[0,index_answered] = -np.inf # don't ask the same question twice
                 a = agent.sample_actions(qvalues)[0]
 
                 # update s with the answer
@@ -499,6 +514,9 @@ def run_RL(k_neighbors = 8, lr = 3e-1, batch_size = 32, start_epsilon = 0.2):
                 state = next_state
                 # update state
                 s = next_s
+                # update answered
+                answered = next_answered
+            
 
         # extend buffers
         s_batch.extend(s_list)
@@ -543,18 +561,32 @@ def run_RL(k_neighbors = 8, lr = 3e-1, batch_size = 32, start_epsilon = 0.2):
 
         ### compute error for all people (this should probably be a separate function)
         if ep % refresh_target_network_freq == 0:
-            # iterate train
+            # iterate test
             error = 0
             for person_i in range(test.shape[0]):
-                if verbose2: print(f'Persona {person_i}')
+                if verbose2: print(f'Questions for person {person_i}:')
                 real_s_i = test.iloc[person_i].values
                 s_i = np.nan*np.ones(N_questions)
                 answered_i = np.zeros(N_questions)
                 state_i = np.concatenate([imputer.transform(np.array([s_i]))[0], answered_i])
                 for j in range(T_questions):
                     qvalues_i = agent.get_qvalues([state_i])
+
+                    index_answered = np.where(answered_i == 1)[0]
+                    # print('index_answered', index_answered)
+                    # print('qvalues pre', qvalues_i)
+                    qvalues_i[0,index_answered] = -np.inf # don't ask the same question twice
+                    # print('qvalues post', qvalues_i)
+                    # print('qvalues 0 index answered', qvalues[0,index_answered])
                     # choose best arg for qvalues
                     a_i = qvalues_i.argmax()
+                    # print('a_i', a_i)
+                    print(f'Question {j+1} is {a_i}')
+                   
+                      
+                        
+
+                    
                     if real_s_i[a_i] == 1:
                         # update s
                         next_s_i = s_i.copy()
@@ -573,12 +605,13 @@ def run_RL(k_neighbors = 8, lr = 3e-1, batch_size = 32, start_epsilon = 0.2):
                     if j == T_questions-1:
                         # persona i print
 
-                       
+                        print('-----------------------')
                         if verbose2: print(f'Predict vals {s_predict_i}')
                         if verbose2: print(f'Real s {real_s_i}')
                         r_i = -np.sum(np.abs(s_predict_i - real_s_i))/(N_questions-T_questions)
                         if verbose2: print(f'Reward {r_i}')
                         if verbose2: print('-'*10)
+                        print('-----------------------')    
                     else:
                         r_i = 0
 
@@ -606,7 +639,9 @@ def run_RL(k_neighbors = 8, lr = 3e-1, batch_size = 32, start_epsilon = 0.2):
                         f'Batch Size: {batch_size}\n'
                         f'K-Neighb: {k_neighbors}\n'
                         f'Start Eps: {start_epsilon}\n'
-                        f'N People: {number_of_people}\n')
+                        f'Total People: {total_people}\n'
+                        f'RL People: {rl_people}\n'
+                        f'Test People: {test_people}\n')
 
             # Place the text box in upper left in axes coords
             props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
@@ -620,7 +655,7 @@ def run_RL(k_neighbors = 8, lr = 3e-1, batch_size = 32, start_epsilon = 0.2):
             plt.ylabel('Mean reward')
 
             # name file with parameters
-            plt.savefig(f'output/error_list_E{episodes}_M{T_questions}_N{N_questions}_ts{train_size}_lr{lr}_batch_size{batch_size}_epsilon{start_epsilon}_kneigh{k_neighbors}_refresh{refresh_target_network_freq}.png')
+            plt.savefig(f'{output_folder}/error_list_E{episodes}_M{T_questions}_N{N_questions}_ts{train_size}_lr{lr}_batch_size{batch_size}_epsilon{start_epsilon}_kneigh{k_neighbors}_refresh{refresh_target_network_freq}.png')
             plt.close()
 
         # 
@@ -637,13 +672,13 @@ def run_RL(k_neighbors = 8, lr = 3e-1, batch_size = 32, start_epsilon = 0.2):
                 mean_rw_history_partial = savgol_filter(mean_rw_history, smoothing_window, 1)
 
                 # save as csv
-                # np.savetxt('output/mean_rw_history.csv', mean_rw_history, delimiter=',')
+                # np.savetxt(f'{output_folder}/mean_rw_history.csv', mean_rw_history, delimiter=',')
                 
                 plt.figure()
                 plt.plot(mean_rw_history_partial)
                 plt.title('Mean reward until episode ' + str(ep))
                 # name file with parameters
-                plt.savefig(f'output/mean_rw_history_E{episodes}_M{T_questions}_N{N_questions}_ts{train_size}.png')
+                plt.savefig(f'{output_folder}/mean_rw_history_E{episodes}_M{T_questions}_N{N_questions}_ts{train_size}.png')
                 plt.close()
                 # next plot        
     return error_list[-1]
@@ -695,7 +730,7 @@ def main():
     # save results
     results_df = pandas.DataFrame(results)
 
-    # results_df.to_csv('output/results.csv')
+    # results_df.to_csv(f'{output_folder}/results.csv')
 
 
         
