@@ -224,14 +224,14 @@ def compute_td_loss(agent, target_network, states, actions, rewards, next_states
 def epsilon_schedule(start_eps, end_eps, step, final_step):
     return start_eps + (end_eps-start_eps)*min(step, final_step)/final_step
 
-def greedy_0(imputer, train, T_questions, verbose = True):
+def greedy_0(imputer, df, T_questions, verbose = True):
     # test error using a greedy 0 policy
     if verbose: print('Greedy 0')
-    N_questions = train.shape[1]
+    N_questions = df.shape[1]
     error_greedy_list = []
-    for person_i in range(train.shape[0]):
+    for person_i in range(df.shape[0]):
         if verbose: print(f'Person {person_i}')
-        real_s_i = train.iloc[person_i].values
+        real_s_i = df.iloc[person_i].values
         s_i = np.nan*np.ones(N_questions)
         for j in range(T_questions):
             probs_ij = imputer.transform(np.array([s_i]))[0]
@@ -281,16 +281,17 @@ def run_RL(k_neighbors = 8, lr = 3e-1, batch_size = 32, start_epsilon = 0.2):
 
     # read data/df_turkey.csv
     # df_turkey = pandas.read_csv('data/df_turkey.csv', index_col=0, sep=';')
-    # df_complete = pandas.read_csv('data/data_complete.csv', index_col=0, sep=',')
-    df_complete = pandas.read_csv('synthetic_data/synthetic_data_10_1000.csv', sep=',')
+    df_complete = pandas.read_csv('data/data_complete.csv', index_col=0, sep=',')
+    # df_complete = pandas.read_csv('synthetic_data/synthetic_data_10_1000.csv', sep=',')
 
     # output folder
-    output_folder = 'output_synthetic'
+    output_folder = 'output'
 
     # parameters
     # N_questions = 15
     N_questions = df_complete.shape[1]
-    T_questions = int(N_questions/2)
+    # T_questions = int(N_questions/2)
+    T_questions = 9
     train_size = 2/3
     # k_neighbors = 8
     reward_every_question = False
@@ -562,7 +563,7 @@ def run_RL(k_neighbors = 8, lr = 3e-1, batch_size = 32, start_epsilon = 0.2):
         ### compute error for all people (this should probably be a separate function)
         if ep % refresh_target_network_freq == 0:
             # iterate test
-            error = 0
+            error = []
             for person_i in range(test.shape[0]):
                 if verbose2: print(f'Questions for person {person_i}:')
                 real_s_i = test.iloc[person_i].values
@@ -605,13 +606,14 @@ def run_RL(k_neighbors = 8, lr = 3e-1, batch_size = 32, start_epsilon = 0.2):
                     if j == T_questions-1:
                         # persona i print
 
-                        print('-----------------------')
+                        if verbose2: print('-----------------------')
                         if verbose2: print(f'Predict vals {s_predict_i}')
                         if verbose2: print(f'Real s {real_s_i}')
                         r_i = -np.sum(np.abs(s_predict_i - real_s_i))/(N_questions-T_questions)
+                        error.append(r_i)
                         if verbose2: print(f'Reward {r_i}')
                         if verbose2: print('-'*10)
-                        print('-----------------------')    
+                        if verbose2: print('-----------------------')    
                     else:
                         r_i = 0
 
@@ -625,8 +627,10 @@ def run_RL(k_neighbors = 8, lr = 3e-1, batch_size = 32, start_epsilon = 0.2):
                     state_i = next_state_i
                     s_i = next_s_i
                     answered_i = next_answered_i
-                    error += r_i
-            error_list.append(error/train.shape[0])
+            print(f'Error for episode {ep}: {np.mean(error)}')
+            print('error list', error)   
+                    
+            error_list.append(np.mean(error))
             # plot error_list
             plt.figure()
             plt.plot(error_list, label = 'RL')
