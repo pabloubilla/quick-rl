@@ -282,16 +282,17 @@ def run_RL(k_neighbors = 8, lr = 3e-1, batch_size = 32, start_epsilon = 0.2):
     # read data/df_turkey.csv
     # df_turkey = pandas.read_csv('data/df_turkey.csv', index_col=0, sep=';')
     df_complete = pandas.read_csv('data/data_complete.csv', index_col=0, sep=',')
-    # df_complete = pandas.read_csv('synthetic_data/synthetic_data_10_1000.csv', sep=',')
+    # df_complete = pandas.read_csv('synthetic_data/synthetic_data_30_1000.csv', sep=',', header=None)
 
     # output folder
-    output_folder = 'output'
+    output_folders = ['output', 'output_synthetic']
+    output_folder = output_folders[0]
 
     # parameters
     # N_questions = 15
     N_questions = df_complete.shape[1]
     # T_questions = int(N_questions/2)
-    T_questions = 9
+    T_questions = 15
     train_size = 2/3
     # k_neighbors = 8
     reward_every_question = False
@@ -643,9 +644,12 @@ def run_RL(k_neighbors = 8, lr = 3e-1, batch_size = 32, start_epsilon = 0.2):
                         f'Batch Size: {batch_size}\n'
                         f'K-Neighb: {k_neighbors}\n'
                         f'Start Eps: {start_epsilon}\n'
-                        f'Total People: {total_people}\n'
                         f'RL People: {rl_people}\n'
-                        f'Test People: {test_people}\n')
+                        f'Test People: {test_people}\n'
+                        f'S (tot. quest.): {N_questions}\n'
+                        f'T (horizon): {T_questions}\n'
+                        f'N (tot. people): {total_people}\n'
+                        )
 
             # Place the text box in upper left in axes coords
             props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)

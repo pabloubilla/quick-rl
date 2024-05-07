@@ -1,0 +1,81 @@
+
+S = 20 / T = 10
+Greedy 0
+
+Person 332
+Question 1 is 6
+Question 2 is 0
+Question 3 is 3
+Question 4 is 5
+Question 5 is 1
+Question 6 is 7
+Question 7 is 8
+Question 8 is 9
+Question 9 is 2
+Question 10 is 4
+Person 333
+Question 1 is 6
+Question 2 is 0
+Question 3 is 3
+Question 4 is 2
+Question 5 is 5
+Question 6 is 9
+Question 7 is 1
+Question 8 is 4
+Question 9 is 7
+Question 10 is 8
+
+
+----------------
+S = 30 / T = 15
+Greedy 0
+
+Person 331
+Question 1 is 0
+Question 2 is 13
+Question 3 is 5
+Question 4 is 1
+Question 5 is 12
+Question 6 is 9
+Question 7 is 6
+Question 8 is 11
+Question 9 is 10
+Question 10 is 7
+Question 11 is 4
+Question 12 is 3
+Question 13 is 8
+Question 14 is 25
+Question 15 is 2
+Person 332
+Question 1 is 0
+Question 2 is 4
+Question 3 is 1
+Question 4 is 2
+Question 5 is 3
+Question 6 is 7
+Question 7 is 11
+Question 8 is 9
+Question 9 is 10
+Question 10 is 6
+Question 11 is 8
+Question 12 is 13
+Question 13 is 27
+Question 14 is 23
+Question 15 is 28
+Person 333
+Question 1 is 0
+Question 2 is 4
+Question 3 is 9
+Question 4 is 12
+Question 5 is 8
+Question 6 is 2
+Question 7 is 1
+Question 8 is 5
+Question 9 is 6
+Question 10 is 7
+Question 11 is 13
+Question 12 is 11
+Question 13 is 3
+Question 14 is 25
+Question 15 is 16
+
