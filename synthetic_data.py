@@ -3,7 +3,7 @@ import numpy as np
 
 # Parameters
 S = [10*(i+1) for i in range(5)] # total number of questions
-N = [10,100,1000] # number of individuals (answerers)
+N = [100,400,1000] # number of individuals (answerers)
 rho = 0.99 # Pearson correlation coefficient
 p = 0.5 # Bernoulli parameter
 
@@ -60,15 +60,15 @@ def generate_synthetic_data(S, N, rho, p):
                     Y3[j, i] = X[j, i]
         y3_list.append(np.corrcoef(X[:, i], Y3[:, i])[0,1])
     print("-"*50)
-    print('y1')
-    print(np.mean(y1_list))
-    print(np.std(y1_list))
+    # print('y1')
+    # print(np.mean(y1_list))
+    # print(np.std(y1_list))
     print('y2')
     print(np.mean(y2_list))
     print(np.std(y2_list))
-    print('y3')
-    print(np.mean(y3_list))
-    print(np.std(y3_list))
+    # print('y3')
+    # print(np.mean(y3_list))
+    # print(np.std(y3_list))
 
     # Select method
     Y = Y2 
@@ -79,7 +79,12 @@ def generate_synthetic_data(S, N, rho, p):
         X[:, j] = X[j_indices, j]
         Y[:, j] = Y[j_indices, j]
 
-    return np.concatenate((X, Y), axis=1)
+    Z = np.concatenate((X, Y), axis=1)
+
+    print("Correlation matrix of output:")
+    print(np.corrcoef(Z.T))
+
+    return Z
 
 for s in S:
     for n in N:

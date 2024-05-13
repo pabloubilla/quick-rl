@@ -1,4 +1,4 @@
-import pandas as pandas
+import pandas as pd
 import numpy as np
 from Agents import MonteCarloG, MonteCarloG_baseline, MonteCarloG_statevalue, DQNAgent
 from scipy.signal import savgol_filter
@@ -281,22 +281,29 @@ def run_RL(k_neighbors = 8, lr = 3e-1, batch_size = 32, start_epsilon = 0.2):
     verbose = False
     verbose2 = True
 
-    # read data/df_turkey.csv
-    # df_turkey = pandas.read_csv('data/df_turkey.csv', index_col=0, sep=';')
-    # df_complete = pandas.read_csv('data/data_complete.csv', index_col=0, sep=',')
-    df_complete = pandas.read_csv('synthetic_data/synthetic_data_30_1000.csv', sep=',', header=None)
+    # Read data
+    data_types = ['real', 'synthetic', 'turkey']
+    data_type = data_types[1]
+    M,N = 30, 100
+    corr_coef = 0.99
+    if data_type == 'real':
+        df_complete = pd.read_csv('data/data_complete.csv', index_col=0, sep=',')
+    elif data_type == 'synthetic':
+        df_complete = pd.read_csv(f'synthetic_data/synthetic_data_{M}_{N}_corr{corr_coef}.csv', sep=',', header=None)
+    elif data_type == 'turkey':
+        df_turkey = pd.read_csv('data/df_turkey.csv', index_col=0, sep=';')
+    else:
+        print('Data type not found')
+        exit()
 
     # output folder
     output_folders = ['output', 'output_synthetic']
     output_folder = output_folders[1]
 
     # parameters
-    # N_questions = 15
-    N_questions = df_complete.shape[1]
-    # T_questions = int(N_questions/2)
-    T_questions = 15
+    N_questions = df_complete.shape[1] # M when synthetic
+    T_questions = N_questions//2 
     train_size = 2/3
-    # k_neighbors = 8
     reward_every_question = False
     # lr = 5e-4
     batch_size = 32
@@ -314,6 +321,9 @@ def run_RL(k_neighbors = 8, lr = 3e-1, batch_size = 32, start_epsilon = 0.2):
     total_people = df_complete.shape[0]
 
     # train a KNNImputer on train
+    # k_neighbors adjustment 
+    if total_people < 400:
+        k_neighbors = int(total_people / 8) # Could be abother fraction 
     imputer = KNNImputer(n_neighbors=k_neighbors)
     imputer.fit(train_probs.to_numpy())
 
@@ -652,10 +662,11 @@ def run_RL(k_neighbors = 8, lr = 3e-1, batch_size = 32, start_epsilon = 0.2):
                         f'Start Eps: {start_epsilon}\n'
                         f'RL People: {rl_people}\n'
                         f'Test People: {test_people}\n'
-                        f'S (tot. quest.): {N_questions}\n'
+                        f'M (tot. quest.): {N_questions}\n'
                         f'T (horizon): {T_questions}\n'
                         f'N (tot. people): {total_people}\n'
-                        f'Ex. time (mins): {np.round((time()-t0)/60,3)}'
+                        f'Ex. time (mins): {np.round((time()-t0)/60,3)}\n'
+                        f'Data: {data_type}'
                         )
 
             # Place the text box in upper left in axes coords
@@ -663,14 +674,14 @@ def run_RL(k_neighbors = 8, lr = 3e-1, batch_size = 32, start_epsilon = 0.2):
             plt.gca().text(0.05, 0.95, param_text, transform=plt.gca().transAxes, fontsize=10,
                         verticalalignment='top', bbox=props)
             
-            # Finish up setting the plot
-            plt.legend()
+            # Finish up setting the plot 
+            plt.legend(loc='lower right')
             plt.title('Error until episode ' + str(ep))
             plt.xlabel(f'Episode (once every {refresh_target_network_freq})')
             plt.ylabel('Mean reward')
 
             # name file with parameters
-            plt.savefig(f'{output_folder}/error_list_E{episodes}_T{T_questions}_S{N_questions}_N{total_people}_ts{train_size}_lr{lr}_batch_size{batch_size}_epsilon{start_epsilon}_kneigh{k_neighbors}_refresh{refresh_target_network_freq}.png')
+            plt.savefig(f'{output_folder}/error_list_E{episodes}_T{T_questions}_M{N_questions}_N{total_people}_ts{train_size}_lr{lr}_batch_size{batch_size}_epsilon{start_epsilon}_kneigh{k_neighbors}_refresh{refresh_target_network_freq}.png')
             plt.close()
 
         # 
@@ -708,7 +719,7 @@ def main():
     #               'lr': [1e-1, 3e-1, 5e-1], 
     #               'batch_size': [32, 64], 
     #               'start_epsilon': [0.1, 0.4, 0.6]}
-    param_grid = {'k_neighbors': [20], 
+    param_grid = {'k_neighbors': [31], # Can be a fraction of total people
                   'lr': [1e-4],
                   'batch_size': [32],
                   'start_epsilon': [0.4]}
@@ -743,7 +754,7 @@ def main():
             results.append(results_dict)
     
     # save results
-    results_df = pandas.DataFrame(results)
+    results_df = pd.DataFrame(results)
 
     # results_df.to_csv(f'{output_folder}/results.csv')
 
