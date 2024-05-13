@@ -84,5 +84,7 @@ def generate_synthetic_data(S, N, rho, p):
 for s in S:
     for n in N:
         data = generate_synthetic_data(s, n, rho, p)
-        np.savetxt(f'synthetic_data/synthetic_data_{s}_{n}.csv', data, delimiter=',')
+        np.savetxt(f'synthetic_data/synthetic_data_{s}_{n}_corr{rho}.csv', data, delimiter=',')
 # %%
+
+# Previous names did not have the corr. (rho=0.99)

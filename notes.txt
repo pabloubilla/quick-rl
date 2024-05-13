@@ -27,7 +27,7 @@ Question 10 is 8
 
 
 ----------------
-S = 30 / T = 15
+S = 30 / T = 15 / N=1000
 Greedy 0
 
 Person 331
@@ -78,4 +78,109 @@ Question 12 is 11
 Question 13 is 3
 Question 14 is 25
 Question 15 is 16
+
+
+
+----------------
+S = 30 / T = 15 / N=100
+Greedy 0
+
+
+Person 31
+Question 1 is 7
+Question 2 is 2
+Question 3 is 6
+Question 4 is 0
+Question 5 is 14
+Question 6 is 15
+Question 7 is 10
+Question 8 is 17
+Question 9 is 29
+Question 10 is 12
+Question 11 is 11
+Question 12 is 13
+Question 13 is 28
+Question 14 is 26
+Question 15 is 25
+Person 32
+Question 1 is 7
+Question 2 is 2
+Question 3 is 12
+Question 4 is 10
+Question 5 is 1
+Question 6 is 3
+Question 7 is 14
+Question 8 is 22
+Question 9 is 6
+Question 10 is 21
+Question 11 is 17
+Question 12 is 18
+Question 13 is 16
+Question 14 is 27
+Question 15 is 25
+Person 33
+Question 1 is 7
+Question 2 is 2
+Question 3 is 12
+Question 4 is 10
+Question 5 is 1
+Question 6 is 6
+Question 7 is 14
+Question 8 is 0
+Question 9 is 25
+Question 10 is 27
+Question 11 is 29
+Question 12 is 22
+Question 13 is 17
+Question 14 is 11
+Question 15 is 26
+
+
+
+----------------
+S = 25 / T = 15 (Real data)
+Greedy 0
+
+Question 7 is 8
+Question 8 is 7
+Question 9 is 15
+Question 10 is 0
+Question 11 is 16
+Question 12 is 1
+Question 13 is 5
+Question 14 is 4
+Question 15 is 20
+Person 136
+Question 1 is 13
+Question 2 is 9
+Question 3 is 3
+Question 4 is 15
+Question 5 is 12
+Question 6 is 7
+Question 7 is 0
+Question 8 is 24
+Question 9 is 20
+Question 10 is 5
+Question 11 is 11
+Question 12 is 17
+Question 13 is 4
+Question 14 is 16
+Question 15 is 19
+Person 137
+Question 1 is 13
+Question 2 is 0
+Question 3 is 7
+Question 4 is 15
+Question 5 is 22
+Question 6 is 8
+Question 7 is 1
+Question 8 is 9
+Question 9 is 17
+Question 10 is 6
+Question 11 is 24
+Question 12 is 23
+Question 13 is 16
+Question 14 is 10
+Question 15 is 14
+
 

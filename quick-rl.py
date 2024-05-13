@@ -11,6 +11,8 @@ import matplotlib.pyplot as plt
 import itertools
 from multiprocessing import Pool
 
+from time import time
+
 TF_ENABLE_ONEDNN_OPTS=0
 
 # def run_repetitions(rl_method, n_repetitions, n_episodes, smoothing_window, learning_rate, gamma, max_steps):
@@ -281,12 +283,12 @@ def run_RL(k_neighbors = 8, lr = 3e-1, batch_size = 32, start_epsilon = 0.2):
 
     # read data/df_turkey.csv
     # df_turkey = pandas.read_csv('data/df_turkey.csv', index_col=0, sep=';')
-    df_complete = pandas.read_csv('data/data_complete.csv', index_col=0, sep=',')
-    # df_complete = pandas.read_csv('synthetic_data/synthetic_data_30_1000.csv', sep=',', header=None)
+    # df_complete = pandas.read_csv('data/data_complete.csv', index_col=0, sep=',')
+    df_complete = pandas.read_csv('synthetic_data/synthetic_data_30_1000.csv', sep=',', header=None)
 
     # output folder
     output_folders = ['output', 'output_synthetic']
-    output_folder = output_folders[0]
+    output_folder = output_folders[1]
 
     # parameters
     # N_questions = 15
@@ -318,6 +320,10 @@ def run_RL(k_neighbors = 8, lr = 3e-1, batch_size = 32, start_epsilon = 0.2):
 
     # test error using a greedy 0 policy
     error_greedy = greedy_0(imputer, test, T_questions, verbose=verbose2)
+
+    # RL
+    t0 = time()
+
 
     # state_shape = (n_questions,)
     state_shape = (2*N_questions,)
@@ -649,6 +655,7 @@ def run_RL(k_neighbors = 8, lr = 3e-1, batch_size = 32, start_epsilon = 0.2):
                         f'S (tot. quest.): {N_questions}\n'
                         f'T (horizon): {T_questions}\n'
                         f'N (tot. people): {total_people}\n'
+                        f'Ex. time (mins): {np.round((time()-t0)/60,3)}'
                         )
 
             # Place the text box in upper left in axes coords
@@ -663,7 +670,7 @@ def run_RL(k_neighbors = 8, lr = 3e-1, batch_size = 32, start_epsilon = 0.2):
             plt.ylabel('Mean reward')
 
             # name file with parameters
-            plt.savefig(f'{output_folder}/error_list_E{episodes}_M{T_questions}_N{N_questions}_ts{train_size}_lr{lr}_batch_size{batch_size}_epsilon{start_epsilon}_kneigh{k_neighbors}_refresh{refresh_target_network_freq}.png')
+            plt.savefig(f'{output_folder}/error_list_E{episodes}_T{T_questions}_S{N_questions}_N{total_people}_ts{train_size}_lr{lr}_batch_size{batch_size}_epsilon{start_epsilon}_kneigh{k_neighbors}_refresh{refresh_target_network_freq}.png')
             plt.close()
 
         # 
@@ -686,7 +693,7 @@ def run_RL(k_neighbors = 8, lr = 3e-1, batch_size = 32, start_epsilon = 0.2):
                 plt.plot(mean_rw_history_partial)
                 plt.title('Mean reward until episode ' + str(ep))
                 # name file with parameters
-                plt.savefig(f'{output_folder}/mean_rw_history_E{episodes}_M{T_questions}_N{N_questions}_ts{train_size}.png')
+                plt.savefig(f'{output_folder}/mean_rw_history_E{episodes}_T{T_questions}_S{N_questions}_N{total_people}_ts{train_size}.png')
                 plt.close()
                 # next plot        
     return error_list[-1]
