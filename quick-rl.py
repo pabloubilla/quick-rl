@@ -226,7 +226,7 @@ def compute_td_loss(agent, target_network, states, actions, rewards, next_states
 def epsilon_schedule(start_eps, end_eps, step, final_step):
     return start_eps + (end_eps-start_eps)*min(step, final_step)/final_step
 
-def greedy_0(imputer, df, T_questions, verbose = True):
+def compute_error_greedy0(imputer, df, T_questions, verbose = True):
     # test error using a greedy 0 policy
     if verbose: print('Greedy 0')
     N_questions = df.shape[1]
@@ -265,6 +265,73 @@ def greedy_0(imputer, df, T_questions, verbose = True):
     return error_greedy
 
 
+def compute_error_RL(agent, imputer, df, T_questions, verbose = True):
+
+    error_list = []
+    S_questions = df.shape[1]
+    for person_i in range(df.shape[0]):
+        if verbose: print(f'Questions for person {person_i}:')
+        real_s_i = df.iloc[person_i].values
+        s_i = np.nan*np.ones(S_questions)
+        answered_i = np.zeros(S_questions)
+        state_i = np.concatenate([imputer.transform(np.array([s_i]))[0], answered_i])
+        for j in range(T_questions):
+            qvalues_i = agent.get_qvalues([state_i])
+
+            index_answered = np.where(answered_i == 1)[0]
+            # print('index_answered', index_answered)
+            # print('qvalues pre', qvalues_i)
+            qvalues_i[0,index_answered] = -np.inf # don't ask the same question twice
+            # print('qvalues post', qvalues_i)
+            # print('qvalues 0 index answered', qvalues[0,index_answered])
+            # choose best arg for qvalues
+            a_i = qvalues_i.argmax()
+            # print('a_i', a_i)
+            print(f'Question {j+1} is {a_i}')
+        
+            
+            if real_s_i[a_i] == 1:
+                # update s
+                next_s_i = s_i.copy()
+                next_s_i[a_i] = 1
+            else:
+                next_s_i = s_i.copy()
+                next_s_i[a_i] = 0
+
+            next_answered_i = answered_i.copy()
+            next_answered_i[a_i] = 1
+
+            s_predict_i = next_s_i.copy()
+            s_predict_i = imputer.transform(np.array([s_predict_i]))[0]
+            # round
+            s_predict_i = np.round(s_predict_i)
+            if j == T_questions-1:
+                # persona i print
+
+                if verbose: print('-----------------------')
+                if verbose: print(f'Predict vals {s_predict_i}')
+                if verbose: print(f'Real s {real_s_i}')
+                r_i = -np.sum(np.abs(s_predict_i - real_s_i))/(S_questions-T_questions)
+                error_list.append(r_i)
+                if verbose: print(f'Reward {r_i}')
+                if verbose: print('-'*10)
+                if verbose: print('-----------------------')    
+            else:
+                r_i = 0
+
+            if j == T_questions-1:
+                done_i = True
+            else:
+                done_i = False
+
+            next_state_i = np.concatenate([s_predict_i, next_answered_i])
+
+            state_i = next_state_i
+            s_i = next_s_i
+            answered_i = next_answered_i
+    return error_list
+
+
 ### add play and record function
 
 def run_experiment(params):
@@ -284,7 +351,7 @@ def run_RL(k_neighbors = 8, lr = 3e-1, batch_size = 32, start_epsilon = 0.2):
     # Read data
     data_types = ['real', 'synthetic', 'turkey']
     data_type = data_types[1]
-    M,N = 30, 100
+    M,N = 10, 400
     corr_coef = 0.99
     if data_type == 'real':
         df_complete = pd.read_csv('data/data_complete.csv', index_col=0, sep=',')
@@ -329,7 +396,8 @@ def run_RL(k_neighbors = 8, lr = 3e-1, batch_size = 32, start_epsilon = 0.2):
 
 
     # test error using a greedy 0 policy
-    error_greedy = greedy_0(imputer, test, T_questions, verbose=verbose2)
+    mean_error_greedy_test = compute_error_greedy0(imputer, test, T_questions, verbose=verbose2)
+    mean_error_greedy_train = compute_error_greedy0(imputer, train_rl, T_questions, verbose=verbose2)
 
     # RL
     t0 = time()
@@ -376,7 +444,8 @@ def run_RL(k_neighbors = 8, lr = 3e-1, batch_size = 32, start_epsilon = 0.2):
     # history
     mean_rw_history = []
     td_loss_history = []
-    error_list = []
+    mean_error_list_test = []
+    mean_error_list_train = []
 
 
     s_batch = []
@@ -579,80 +648,90 @@ def run_RL(k_neighbors = 8, lr = 3e-1, batch_size = 32, start_epsilon = 0.2):
 
         ### compute error for all people (this should probably be a separate function)
         if ep % refresh_target_network_freq == 0:
-            # iterate test
-            error = []
-            for person_i in range(test.shape[0]):
-                if verbose2: print(f'Questions for person {person_i}:')
-                real_s_i = test.iloc[person_i].values
-                s_i = np.nan*np.ones(N_questions)
-                answered_i = np.zeros(N_questions)
-                state_i = np.concatenate([imputer.transform(np.array([s_i]))[0], answered_i])
-                for j in range(T_questions):
-                    qvalues_i = agent.get_qvalues([state_i])
+            
+            error_list_test = compute_error_RL(agent, imputer, test, T_questions, verbose = verbose2)
+            error_list_train = compute_error_RL(agent, imputer, train_rl, T_questions, verbose = verbose2)
 
-                    index_answered = np.where(answered_i == 1)[0]
-                    # print('index_answered', index_answered)
-                    # print('qvalues pre', qvalues_i)
-                    qvalues_i[0,index_answered] = -np.inf # don't ask the same question twice
-                    # print('qvalues post', qvalues_i)
-                    # print('qvalues 0 index answered', qvalues[0,index_answered])
-                    # choose best arg for qvalues
-                    a_i = qvalues_i.argmax()
-                    # print('a_i', a_i)
-                    print(f'Question {j+1} is {a_i}')
-                   
-                      
+            ### We changed this to a function (compute_error_RL) ###
+            # # iterate test
+            # error = []
+            # for person_i in range(test.shape[0]):
+            #     if verbose2: print(f'Questions for person {person_i}:')
+            #     real_s_i = test.iloc[person_i].values
+            #     s_i = np.nan*np.ones(N_questions)
+            #     answered_i = np.zeros(N_questions)
+            #     state_i = np.concatenate([imputer.transform(np.array([s_i]))[0], answered_i])
+            #     for j in range(T_questions):
+            #         qvalues_i = agent.get_qvalues([state_i])
+
+            #         index_answered = np.where(answered_i == 1)[0]
+            #         # print('index_answered', index_answered)
+            #         # print('qvalues pre', qvalues_i)
+            #         qvalues_i[0,index_answered] = -np.inf # don't ask the same question twice
+            #         # print('qvalues post', qvalues_i)
+            #         # print('qvalues 0 index answered', qvalues[0,index_answered])
+            #         # choose best arg for qvalues
+            #         a_i = qvalues_i.argmax()
+            #         # print('a_i', a_i)
+            #         print(f'Question {j+1} is {a_i}')
+                    
+            #         if real_s_i[a_i] == 1:
+            #             # update s
+            #             next_s_i = s_i.copy()
+            #             next_s_i[a_i] = 1
+            #         else:
+            #             next_s_i = s_i.copy()
+            #             next_s_i[a_i] = 0
+
+            #         next_answered_i = answered_i.copy()
+            #         next_answered_i[a_i] = 1
+
+            #         s_predict_i = next_s_i.copy()
+            #         s_predict_i = imputer.transform(np.array([s_predict_i]))[0]
+            #         # round
+            #         s_predict_i = np.round(s_predict_i)
+            #         if j == T_questions-1:
+            #             # persona i print
+
+            #             if verbose2: print('-----------------------')
+            #             if verbose2: print(f'Predict vals {s_predict_i}')
+            #             if verbose2: print(f'Real s {real_s_i}')
+            #             r_i = -np.sum(np.abs(s_predict_i - real_s_i))/(N_questions-T_questions)
+            #             error.append(r_i)
+            #             if verbose2: print(f'Reward {r_i}')
+            #             if verbose2: print('-'*10)
+            #             if verbose2: print('-----------------------')    
+            #         else:
+            #             r_i = 0
+
+            #         if j == T_questions-1:
+            #             done_i = True
+            #         else:
+            #             done_i = False
+
+            #         next_state_i = np.concatenate([s_predict_i, next_answered_i])
+
+            #         state_i = next_state_i
+            #         s_i = next_s_i
+            #         answered_i = next_answered_i
+
+            if verbose2:
+                print('-'*20)
+                print(f'Error for episode {ep}:')
+                print(f'Train error mean: {np.mean(error_list_train)}')
+                print(f'Train error list', error_list_train)        
+                print(f'Test error mean: {np.mean(error_list_test)}') 
+                print('Test error list', error_list_test)   
                         
-
-                    
-                    if real_s_i[a_i] == 1:
-                        # update s
-                        next_s_i = s_i.copy()
-                        next_s_i[a_i] = 1
-                    else:
-                        next_s_i = s_i.copy()
-                        next_s_i[a_i] = 0
-
-                    next_answered_i = answered_i.copy()
-                    next_answered_i[a_i] = 1
-
-                    s_predict_i = next_s_i.copy()
-                    s_predict_i = imputer.transform(np.array([s_predict_i]))[0]
-                    # round
-                    s_predict_i = np.round(s_predict_i)
-                    if j == T_questions-1:
-                        # persona i print
-
-                        if verbose2: print('-----------------------')
-                        if verbose2: print(f'Predict vals {s_predict_i}')
-                        if verbose2: print(f'Real s {real_s_i}')
-                        r_i = -np.sum(np.abs(s_predict_i - real_s_i))/(N_questions-T_questions)
-                        error.append(r_i)
-                        if verbose2: print(f'Reward {r_i}')
-                        if verbose2: print('-'*10)
-                        if verbose2: print('-----------------------')    
-                    else:
-                        r_i = 0
-
-                    if j == T_questions-1:
-                        done_i = True
-                    else:
-                        done_i = False
-
-                    next_state_i = np.concatenate([s_predict_i, next_answered_i])
-
-                    state_i = next_state_i
-                    s_i = next_s_i
-                    answered_i = next_answered_i
-            print(f'Error for episode {ep}: {np.mean(error)}')
-            print('error list', error)   
-                    
-            error_list.append(np.mean(error))
+            mean_error_list_test.append(np.mean(error_list_test))
+            mean_error_list_train.append(np.mean(error_list_train))
             # plot error_list
             plt.figure()
-            plt.plot(error_list, label = 'RL')
+            plt.plot(mean_error_list_train, label = 'RL Train')
+            plt.plot(mean_error_list_test, label = 'RL Test')
             # add greedy error to plot
-            plt.axhline(y=error_greedy, color='r', linestyle='--', label='Greedy 0')
+            plt.axhline(y=mean_error_greedy_train, linestyle='--', label='Grd0 Train', color = 'green')
+            plt.axhline(y=mean_error_greedy_test, linestyle='--', label='Grd0 Test', color = 'red')
     
             # Adding an annotation with the parameters
             param_text = (f'Parameters:\n'
@@ -707,7 +786,7 @@ def run_RL(k_neighbors = 8, lr = 3e-1, batch_size = 32, start_epsilon = 0.2):
                 plt.savefig(f'{output_folder}/mean_rw_history_E{episodes}_T{T_questions}_S{N_questions}_N{total_people}_ts{train_size}.png')
                 plt.close()
                 # next plot        
-    return error_list[-1]
+    return error_list_test[-1]
 
 
 def main():
